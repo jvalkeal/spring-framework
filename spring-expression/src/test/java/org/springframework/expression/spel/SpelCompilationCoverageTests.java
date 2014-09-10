@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.StringTokenizer;
 
 import org.junit.Test;
-
 import org.springframework.asm.MethodVisitor;
 import org.springframework.expression.AccessException;
 import org.springframework.expression.EvaluationContext;
@@ -340,6 +339,25 @@ public class SpelCompilationCoverageTests extends AbstractExpressionTests {
 		assertEquals(3.4f,resultC,0.1f);
 
 		assertEquals(3.4f,expression.getValue());
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test
+	public void inlineList() throws Exception {
+		expression = parser.parseExpression("{1,2,3}");
+
+		List<Integer> resultI = expression.getValue(new Object(), List.class);
+		assertEquals(resultI.size(), 3);
+		assertEquals(1, (int)resultI.get(0));
+		assertEquals(2, (int)resultI.get(1));
+		assertEquals(3, (int)resultI.get(2));
+
+		assertCanCompile(expression);
+		List<Integer> resultC = expression.getValue(new Object(), List.class);
+		assertEquals(resultC.size(), 3);
+		assertEquals(1, (int)resultC.get(0));
+		assertEquals(2, (int)resultC.get(1));
+		assertEquals(3, (int)resultC.get(2));
 	}
 	
 	@Test

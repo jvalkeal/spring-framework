@@ -20,8 +20,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.springframework.asm.MethodVisitor;
 import org.springframework.expression.EvaluationException;
 import org.springframework.expression.TypedValue;
+import org.springframework.expression.spel.CodeFlow;
 import org.springframework.expression.spel.ExpressionState;
 import org.springframework.expression.spel.SpelNode;
 
@@ -40,7 +42,7 @@ public class InlineList extends SpelNodeImpl {
 	public InlineList(int pos, SpelNodeImpl... args) {
 		super(pos, args);
 		checkIfConstant();
-	}
+		this.exitTypeDescriptor = "Ljava/lang/List";	}
 
 
 	/**
@@ -121,6 +123,48 @@ public class InlineList extends SpelNodeImpl {
 	@SuppressWarnings("unchecked")
 	public List<Object> getConstantValue() {
 		return (List<Object>) this.constant.getValue();
+	}
+
+	@Override
+	public boolean isCompilable() {
+		if (!isConstant()) {
+			return false;
+		}
+		if (getChildCount() > 1) {
+			for (int c = 1, max = getChildCount(); c < max; c++) {
+				if (!children[c].isCompilable()) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	@Override
+	public void generateCode(MethodVisitor mv, CodeFlow codeflow) {
+		mv.visitTypeInsn(NEW, "java/util/ArrayList");
+		mv.visitInsn(DUP);
+		mv.visitMethodInsn(INVOKESPECIAL, "java/util/ArrayList", "<init>", "()V", false);
+		mv.visitVarInsn(ASTORE, 1);
+		mv.visitVarInsn(ALOAD, 1);
+
+		for (int c = 0; c < this.children.length; c++) {
+			SpelNodeImpl child = this.children[c];
+			codeflow.enterCompilationScope();
+			child.generateCode(mv, codeflow);
+
+			if (CodeFlow.isPrimitive(codeflow.lastDescriptor())) {
+				CodeFlow.insertBoxIfNecessary(mv, codeflow.lastDescriptor().charAt(0));
+			}
+
+			codeflow.exitCompilationScope();
+			mv.visitMethodInsn(INVOKEVIRTUAL, "java/util/ArrayList", "add",
+					"(Ljava/lang/Object;)Z", false);
+			mv.visitInsn(POP);
+			mv.visitVarInsn(ALOAD, 1);
+		}
+
+		codeflow.pushDescriptor(getExitDescriptor());
 	}
 
 }
